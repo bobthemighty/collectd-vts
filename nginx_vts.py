@@ -90,7 +90,7 @@ class NginxMonitor(object):
         for res in cfg.responses:
             collectd.Values(plugin='nginx_server',
                             type='counter',
-                            type_instance='response_'+res,
+                            type_instance='response_'+str(res),
                             plugin_instance=zone,
                             values=[data["responses"][res]]
                             ).dispatch()
@@ -99,31 +99,42 @@ class NginxMonitor(object):
         for upstream in data["upstreamZones"]:
 
             zone = data["upstreamZones"][upstream]
-
-            for ctr in ["inBytes", "outBytes", "usedSize"]:
-                collectd.Values(plugin='nginx_upstream',
-                                type='counter',
-                                type_instance=ctr,
-                                plugin_instance=upstream,
-                                values=[zone[ctr]]
-                                ).dispatch()
-
-            for res in upstream["responses"]:
-                collectd.Values(plugin='nginx_upstream',
-                                type='counter',
-                                type_instance='response_'+res,
-                                plugin_instance=upstream,
-                                values=[zone["responses"][res]]
-                                ).dispatch()
-
-            for flag in ["down", "backup"]:
-                val = zone[flag]
-                collectd.Values(plugin='nginx_upstream',
-                                type='gauge',
-                                type_instance=flag,
-                                plugin_instance=upstream,
-                                values=[1 if val else 0]
-                                ).dispatch()
+	    for server in zone:
+		    name = server["server"]
+		    collectd.Values(plugin='nginx_upstream',
+			            type='gauge',
+				    type_instance='responseMs',
+				    plugin_instance=name,
+				    values=[server["responseMsec"]]
+				    ).dispatch()		
+	            for ctr in ["inBytes", "outBytes", "usedSize"]:
+			collectd.info("foo")
+			if ctr in server:
+		                collectd.Values(plugin='nginx_upstream',
+	                                type='counter',
+	                                type_instance=ctr,
+	                                plugin_instance=name,
+	                                values=[server[ctr]]
+	                                ).dispatch()
+	
+	            for res in server["responses"]:
+			collectd.info("bar")
+	                collectd.Values(plugin='nginx_upstream',
+	                                type='counter',
+	                                type_instance='response_'+res,
+	                                plugin_instance=name,
+	                                values=[server["responses"][res]]
+	                                ).dispatch()
+	
+	            for flag in ["down", "backup"]:
+			collectd.info("baz")
+	                val = server[flag]
+	                collectd.Values(plugin='nginx_upstream',
+	                                type='gauge',
+	                                type_instance=flag,
+	                                plugin_instance=name,
+	                                values=[1 if val else 0]
+	                                ).dispatch()
 
     def read(self):
         response = urllib2.urlopen(self.stats_uri)
@@ -136,6 +147,7 @@ class NginxMonitor(object):
                     data["serverZones"][zone])
             except KeyError:
                 pass
+        self.report_upstreams(data)
         if self.nginxcfg.uptime:
             self.report_uptime(data)
         self.report_connections(data)
